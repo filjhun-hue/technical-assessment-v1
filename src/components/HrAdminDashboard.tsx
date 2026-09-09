@@ -14,14 +14,8 @@ import {
   Trash2,
   FileSpreadsheet,
   X,
-  Database,
   RefreshCw
 } from 'lucide-react';
-import {
-  getSupabaseCredentials,
-  setSupabaseCredentials,
-  testSupabaseConnection
-} from '../utils/supabaseClient';
 
 interface HrAdminDashboardProps {
   reports: CandidateAssessmentReport[];
@@ -42,13 +36,6 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PASSED' | 'REVIEW_REQUIRED' | 'NEEDS_RETEST'>('ALL');
   const [selectedReport, setSelectedReport] = useState<CandidateAssessmentReport | null>(null);
   const [detailTab, setDetailTab] = useState<'overview' | 'dataEntry' | 'quizAnswers'>('overview');
-
-  // Supabase Modal State
-  const [showDbModal, setShowDbModal] = useState(false);
-  const [dbUrl, setDbUrl] = useState(getSupabaseCredentials().url);
-  const [dbAnonKey, setDbAnonKey] = useState(getSupabaseCredentials().anonKey);
-  const [testingDb, setTestingDb] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Filter logic
@@ -98,19 +85,6 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
               title="Fetch latest submissions from Supabase cloud database"
             >
               <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} /> {isSyncing ? 'Syncing...' : 'Sync Cloud'}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setDbUrl(getSupabaseCredentials().url);
-                setDbAnonKey(getSupabaseCredentials().anonKey);
-                setShowDbModal(true);
-              }}
-              style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-            >
-              <Database size={15} color="#38bdf8" /> Supabase Config
             </button>
 
             <button
@@ -545,137 +519,6 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Supabase Connection & Configuration Modal */}
-      {showDbModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '1.5rem'
-          }}
-        >
-          <div
-            className="glass-panel"
-            style={{
-              maxWidth: '680px',
-              width: '100%',
-              padding: '2rem',
-              background: '#0f172a'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Database size={22} color="#38bdf8" />
-                <h2 style={{ fontSize: '1.35rem', color: '#fff' }}>Supabase Cloud Database Settings</h2>
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ padding: '0.35rem 0.6rem' }}
-                onClick={() => setShowDbModal(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Connect your Supabase project so candidate submissions from Vercel or any device automatically save to your remote PostgreSQL cloud database.
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">Supabase Project URL</label>
-              <input
-                type="url"
-                className="form-input"
-                placeholder="https://xyzcompany.supabase.co"
-                value={dbUrl}
-                onChange={(e) => setDbUrl(e.target.value.trim())}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Supabase Publishable / Anon Key (anon_key)</label>
-              <input
-                type="password"
-                className="form-input"
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                value={dbAnonKey}
-                onChange={(e) => setDbAnonKey(e.target.value.trim())}
-              />
-            </div>
-
-            {testResult && (
-              <div
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '6px',
-                  background: testResult.success ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  border: testResult.success ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
-                  color: testResult.success ? '#6ee7b7' : '#fca5a5',
-                  fontSize: '0.85rem',
-                  marginBottom: '1.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                {testResult.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-                {testResult.message}
-              </div>
-            )}
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-              <strong>Tip for Vercel:</strong> In your Vercel Project Settings &gt; Environment Variables, add:
-              <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem' }}>
-                <li><code>VITE_SUPABASE_URL</code></li>
-                <li><code>VITE_SUPABASE_ANON_KEY</code></li>
-              </ul>
-              Also ensure you ran the table creation script from <code>supabase_schema.sql</code> in your Supabase SQL Editor.
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!dbUrl || !dbAnonKey || testingDb}
-                onClick={async () => {
-                  setTestingDb(true);
-                  setTestResult(null);
-                  const res = await testSupabaseConnection(dbUrl, dbAnonKey);
-                  setTestingDb(false);
-                  setTestResult(res);
-                }}
-              >
-                {testingDb ? 'Testing...' : 'Test Connection'}
-              </button>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={async () => {
-                    setSupabaseCredentials({ url: dbUrl, anonKey: dbAnonKey });
-                    setIsSyncing(true);
-                    await syncReportsWithSupabase();
-                    setIsSyncing(false);
-                    if (onRefreshReports) onRefreshReports();
-                    setShowDbModal(false);
-                  }}
-                >
-                  Save & Sync Now
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
