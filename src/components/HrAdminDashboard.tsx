@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CandidateAssessmentReport } from '../types/assessment';
-import { exportReportsToCSV } from '../utils/storage';
+import { exportReportsToCSV, syncReportsWithSupabase } from '../utils/storage';
 import { NAVIGATION_QUESTIONS } from '../data/navigationQuestions';
 import { TROUBLESHOOTING_QUESTIONS } from '../data/troubleshootingQuestions';
 import { DATA_ENTRY_RECORDINGS } from '../data/dataEntryRecordings';
@@ -10,27 +10,18 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   Eye,
   Trash2,
   FileSpreadsheet,
-  Keyboard,
-  Compass,
-  Headphones,
-  Layers,
-  Wrench,
   X,
   Database,
-  RefreshCw,
-  Check,
-  ExternalLink
+  RefreshCw
 } from 'lucide-react';
 import {
   getSupabaseCredentials,
   setSupabaseCredentials,
   testSupabaseConnection
 } from '../utils/supabaseClient';
-import { syncReportsWithSupabase } from '../utils/storage';
 
 interface HrAdminDashboardProps {
   reports: CandidateAssessmentReport[];
@@ -112,7 +103,11 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setShowDbModal(true)}
+              onClick={() => {
+                setDbUrl(getSupabaseCredentials().url);
+                setDbAnonKey(getSupabaseCredentials().anonKey);
+                setShowDbModal(true);
+              }}
               style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
             >
               <Database size={15} color="#38bdf8" /> Supabase Config
