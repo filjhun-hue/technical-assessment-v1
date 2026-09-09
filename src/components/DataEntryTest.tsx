@@ -8,15 +8,16 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Volume2,
   CheckCircle2,
   Clock,
   ArrowRight,
   User,
-  Hash,
+  Building2,
   Phone,
   Mail,
-  Calendar
+  MapPin,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
 
 interface DataEntryTestProps {
@@ -39,8 +40,7 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
   });
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioProgress, setAudioProgress] = useState(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState(0.95);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.1); // default slightly faster for fast-speaking prospect
   const [timeSpentSeconds, setTimeSpentSeconds] = useState(0);
 
   useEffect(() => {
@@ -73,11 +73,9 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
       playbackSpeed,
       () => {
         setIsPlaying(false);
-        setAudioProgress(100);
       },
-      (speaking, progress) => {
+      (speaking) => {
         setIsPlaying(speaking);
-        setAudioProgress(progress);
       }
     );
   };
@@ -94,12 +92,12 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
 
   const currentRecInput = candidateRecords[activeRec.id] || {};
 
-  // Check how many records have all 5 fields filled
+  // Check how many records have all 6 fields filled
   const totalRecs = DATA_ENTRY_RECORDINGS.length;
   let filledRecordsCount = 0;
   DATA_ENTRY_RECORDINGS.forEach((rec) => {
     const r = candidateRecords[rec.id];
-    if (r && r.customerName && r.accountNumber && r.phoneNumber && r.email && r.appointment) {
+    if (r && r.customerName && r.company && r.phoneNumber && r.email && r.streetAddress && r.appointment) {
       filledRecordsCount++;
     }
   });
@@ -116,10 +114,10 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
         <div>
           <h2 className="panel-title">
             <Headphones size={24} color="#818cf8" />
-            Module 3: Audio Transcription & Data Entry Test
+            Module 3: Fast-Paced Prospect Audio Transcription
           </h2>
           <p className="panel-description">
-            Listen to each inbound caller recording and accurately enter the customer details into the CRM form below. Tests simultaneous listening, typing, date/time formatting, and precision.
+            Simulated inbound prospect call. The prospect speaks quickly, self-corrects mid-call (e.g. initial phone/email revised to corporate line), and spells out complex street addresses. Transcribe the accurate final details into the CRM form.
           </p>
         </div>
 
@@ -142,9 +140,10 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
           const recData = candidateRecords[rec.id] || {};
           const isComplete = Boolean(
             recData.customerName &&
-            recData.accountNumber &&
+            recData.company &&
             recData.phoneNumber &&
             recData.email &&
+            recData.streetAddress &&
             recData.appointment
           );
 
@@ -157,11 +156,10 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
               onClick={() => {
                 if (isPlaying) AudioEngine.stop();
                 setIsPlaying(false);
-                setAudioProgress(0);
                 setActiveRecIndex(idx);
               }}
             >
-              <span>Call #{idx + 1}</span>
+              <span>Prospect #{idx + 1}</span>
               {isComplete && <CheckCircle2 size={15} color="#34d399" />}
             </button>
           );
@@ -175,7 +173,7 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
             type="button"
             className="audio-play-btn"
             onClick={handlePlayAudio}
-            title={isPlaying ? 'Pause Audio' : 'Play Inbound Call Audio'}
+            title={isPlaying ? 'Pause Audio' : 'Play Prospect Audio'}
           >
             {isPlaying ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: '2px' }} />}
           </button>
@@ -218,9 +216,10 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
               onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
               disabled={isPlaying}
             >
-              <option value={0.8}>0.8x Speed</option>
-              <option value={0.95}>1.0x Normal</option>
-              <option value={1.15}>1.2x Fast</option>
+              <option value={0.85}>0.85x Slow</option>
+              <option value={1.0}>1.0x Normal</option>
+              <option value={1.1}>1.1x Fast (Default)</option>
+              <option value={1.25}>1.25x Urgent</option>
             </select>
           </div>
         </div>
@@ -236,24 +235,24 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
           marginBottom: '2rem'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3 style={{ fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            Enter Customer Information for Call #{activeRecIndex + 1}
+            Enter Verified Prospect Information for Call #{activeRecIndex + 1}
           </h3>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            {activeRec.notesPrompt}
+          <span style={{ fontSize: '0.8rem', color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <AlertCircle size={14} /> {activeRec.notesPrompt}
           </span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <User size={14} color="#818cf8" /> Customer Name *
+              <User size={14} color="#818cf8" /> Prospect Full Name *
             </label>
             <input
               type="text"
               className="form-input"
-              placeholder="e.g. Michael Anderson"
+              placeholder="e.g. Johnathan Davies"
               value={currentRecInput.customerName || ''}
               onChange={(e) => handleFieldChange(activeRec.id, 'customerName', e.target.value)}
             />
@@ -261,25 +260,26 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Hash size={14} color="#818cf8" /> Account Number *
+              <Building2 size={14} color="#818cf8" /> Company Name *
             </label>
             <input
               type="text"
               className="form-input"
-              placeholder="e.g. 458921"
-              value={currentRecInput.accountNumber || ''}
-              onChange={(e) => handleFieldChange(activeRec.id, 'accountNumber', e.target.value)}
+              placeholder="e.g. Vanguard Logistics"
+              value={currentRecInput.company || ''}
+              onChange={(e) => handleFieldChange(activeRec.id, 'company', e.target.value)}
             />
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Phone size={14} color="#818cf8" /> Phone Number *
+              <Phone size={14} color="#818cf8" /> Direct Phone Number *
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>(Final corrected number)</span>
             </label>
             <input
               type="tel"
               className="form-input"
-              placeholder="e.g. 555-281-7745"
+              placeholder="e.g. 555-684-2190"
               value={currentRecInput.phoneNumber || ''}
               onChange={(e) => handleFieldChange(activeRec.id, 'phoneNumber', e.target.value)}
             />
@@ -287,12 +287,13 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Mail size={14} color="#818cf8" /> Email Address *
+              <Mail size={14} color="#818cf8" /> Work Email Address *
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>(Final corrected work email)</span>
             </label>
             <input
               type="email"
               className="form-input"
-              placeholder="e.g. name@email.com"
+              placeholder="e.g. j.davies@vanguardlogistics.com"
               value={currentRecInput.email || ''}
               onChange={(e) => handleFieldChange(activeRec.id, 'email', e.target.value)}
             />
@@ -300,12 +301,26 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
 
           <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Calendar size={14} color="#818cf8" /> Appointment Date & Time *
+              <MapPin size={14} color="#818cf8" /> Corporate Street Address *
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>(Spelled-out street name & suite/building)</span>
             </label>
             <input
               type="text"
               className="form-input"
-              placeholder="e.g. September 15, 2026, 3:30 PM"
+              placeholder="e.g. 420 Wyckoff Avenue, Suite 350"
+              value={currentRecInput.streetAddress || ''}
+              onChange={(e) => handleFieldChange(activeRec.id, 'streetAddress', e.target.value)}
+            />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Calendar size={14} color="#818cf8" /> Appointment / Consultation Date & Time *
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. September 18, 2026, 2:00 PM"
               value={currentRecInput.appointment || ''}
               onChange={(e) => handleFieldChange(activeRec.id, 'appointment', e.target.value)}
             />
@@ -325,7 +340,7 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
                 setActiveRecIndex((prev) => prev - 1);
               }}
             >
-              Previous Call
+              Previous Prospect
             </button>
           )}
 
@@ -340,7 +355,7 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
                 setActiveRecIndex((prev) => prev + 1);
               }}
             >
-              Next Call (#{activeRecIndex + 2})
+              Next Prospect (#{activeRecIndex + 2})
             </button>
           )}
         </div>
@@ -357,11 +372,12 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
             <thead>
               <tr>
                 <th>Call Ref</th>
-                <th>Customer Name</th>
-                <th>Account #</th>
-                <th>Phone Number</th>
-                <th>Email Address</th>
-                <th>Appointment Date & Time</th>
+                <th>Prospect Name</th>
+                <th>Company</th>
+                <th>Corrected Phone</th>
+                <th>Work Email</th>
+                <th>Street Address</th>
+                <th>Appointment</th>
                 <th>Replays</th>
               </tr>
             </thead>
@@ -383,9 +399,10 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
                   >
                     <td style={{ fontWeight: 600, color: '#a5b4fc' }}>Call #{idx + 1}</td>
                     <td>{r.customerName || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
-                    <td>{r.accountNumber || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
+                    <td>{r.company || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
                     <td>{r.phoneNumber || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
                     <td>{r.email || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
+                    <td>{r.streetAddress || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
                     <td>{r.appointment || <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
                     <td>{replays[rec.id] || 0}x</td>
                   </tr>
@@ -409,7 +426,7 @@ export const DataEntryTest: React.FC<DataEntryTestProps> = ({ onComplete }) => {
       >
         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
           {filledRecordsCount === totalRecs
-            ? 'All 4 records are completed and ready for submission.'
+            ? 'All 4 prospect records are verified and ready for submission.'
             : `${totalRecs - filledRecordsCount} record(s) still have incomplete fields.`}
         </div>
 

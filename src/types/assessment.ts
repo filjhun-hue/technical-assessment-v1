@@ -55,9 +55,10 @@ export interface QuizResult {
 export interface DataEntryRecord {
   id: string;
   customerName: string;
-  accountNumber: string;
+  company: string;
   phoneNumber: string;
   email: string;
+  streetAddress: string;
   appointment: string;
 }
 

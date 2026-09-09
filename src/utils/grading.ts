@@ -36,14 +36,26 @@ export function evaluateFieldMatch(
   if (field === 'phoneNumber') {
     return normalizePhone(expected) === normalizePhone(actual);
   }
-  if (field === 'accountNumber') {
-    return expected.replace(/\s+/g, '') === actual.replace(/\s+/g, '');
+  if (field === 'company') {
+    return expNorm === actNorm;
   }
   if (field === 'email') {
     return expNorm === actNorm;
   }
   if (field === 'customerName') {
     return expNorm === actNorm;
+  }
+  if (field === 'streetAddress') {
+    const cleanAddr = (s: string) =>
+      normalizeStr(s)
+        .replace(/,/g, '')
+        .replace(/\bave\b/g, 'avenue')
+        .replace(/\bblvd\b/g, 'boulevard')
+        .replace(/\bdr\b/g, 'drive')
+        .replace(/\bct\b/g, 'court')
+        .replace(/\bste\b/g, 'suite')
+        .replace(/\s+/g, ' ');
+    return cleanAddr(expected) === cleanAddr(actual);
   }
   if (field === 'appointment') {
     // Check if key date components match
@@ -62,9 +74,10 @@ export function gradeDataEntry(
 ): DataEntrySubmission {
   const fields: (keyof DataEntryRecord)[] = [
     'customerName',
-    'accountNumber',
+    'company',
     'phoneNumber',
     'email',
+    'streetAddress',
     'appointment'
   ];
 

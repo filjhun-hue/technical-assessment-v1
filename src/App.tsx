@@ -75,15 +75,15 @@ export const App: React.FC = () => {
         },
         dataEntry: {
           candidateRecords: {
-            'rec-1': { customerName: 'Michael Anderson', accountNumber: '458921', phoneNumber: '555-281-7745', email: 'michael.anderson@email.com', appointment: 'September 15, 2026, 3:30 PM' },
-            'rec-2': { customerName: 'Samantha Miller', accountNumber: '892104', phoneNumber: '555-739-1284', email: 's.miller@horizontech.io', appointment: 'October 02, 2026, 10:15 AM' },
-            'rec-3': { customerName: 'David Rodriguez', accountNumber: '614753', phoneNumber: '555-902-3411', email: 'd.rodriguez99@nexuslogistics.com', appointment: 'November 18, 2026, 1:00 PM' },
-            'rec-4': { customerName: 'Jennifer Hayes', accountNumber: '307842', phoneNumber: '555-416-8920', email: 'jennifer.hayes@apexcare.org', appointment: 'December 05, 2026, 4:45 PM' }
+            'rec-1': { customerName: 'Johnathan Davies', company: 'Vanguard Logistics', phoneNumber: '555-684-2190', email: 'j.davies@vanguardlogistics.com', streetAddress: '420 Wyckoff Avenue, Suite 350', appointment: 'September 18, 2026, 2:00 PM' },
+            'rec-2': { customerName: 'Meredith Calhoun', company: 'Apex BioSystems', phoneNumber: '555-704-5829', email: 'mcalhoun@apexbio.org', streetAddress: '1250 Pszczolka Boulevard, Building B', appointment: 'October 05, 2026, 11:30 AM' },
+            'rec-3': { customerName: 'Gregory Braithwaite', company: 'Sterling Financial Partners', phoneNumber: '555-916-4382', email: 'g.braithwaite@sterlingpartners.net', streetAddress: '950 Ksiezopolski Drive, Suite 500', appointment: 'November 12, 2026, 4:15 PM' },
+            'rec-4': { customerName: 'Stephanie Vandeberg', company: 'CloudScale Solutions', phoneNumber: '555-831-6724', email: 'svandeberg@cloudscale.io', streetAddress: '310 Queuencelle Court, Floor 4', appointment: 'December 02, 2026, 9:00 AM' }
           },
           replays: { 'rec-1': 1, 'rec-2': 1, 'rec-3': 2, 'rec-4': 1 },
           accuracyScore: 100,
-          totalFields: 20,
-          correctFields: 20,
+          totalFields: 24,
+          correctFields: 24,
           fieldErrors: [],
           completed: true,
           timeSpentSeconds: 310
@@ -200,12 +200,12 @@ export const App: React.FC = () => {
 
     const activeDataEntry = dataEntryResult || {
       candidateRecords: {
-        'rec-1': { customerName: 'Michael Anderson', accountNumber: '458921', phoneNumber: '555-281-7745', email: 'michael.anderson@email.com', appointment: 'September 15, 2026, 3:30 PM' }
+        'rec-1': { customerName: 'Johnathan Davies', company: 'Vanguard Logistics', phoneNumber: '555-684-2190', email: 'j.davies@vanguardlogistics.com', streetAddress: '420 Wyckoff Avenue, Suite 350', appointment: 'September 18, 2026, 2:00 PM' }
       },
       replays: { 'rec-1': 1 },
-      accuracyScore: 95,
-      totalFields: 20,
-      correctFields: 19,
+      accuracyScore: 96,
+      totalFields: 24,
+      correctFields: 23,
       fieldErrors: [],
       completed: true,
       timeSpentSeconds: 240

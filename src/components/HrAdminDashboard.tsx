@@ -445,14 +445,23 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
                             </tr>
                           </thead>
                           <tbody>
-                            {(['customerName', 'accountNumber', 'phoneNumber', 'email', 'appointment'] as (keyof typeof expected)[]).map((f) => {
+                            {(['customerName', 'company', 'phoneNumber', 'email', 'streetAddress', 'appointment'] as (keyof typeof expected)[]).map((f) => {
                               const expVal = expected[f];
                               const actVal = candidateRec[f] || '';
                               const isMatch = actVal.trim().toLowerCase() === expVal.trim().toLowerCase();
 
+                              const fieldLabels: Record<string, string> = {
+                                customerName: 'Prospect Full Name',
+                                company: 'Company Name',
+                                phoneNumber: 'Direct Phone (Corrected)',
+                                email: 'Work Email (Corrected)',
+                                streetAddress: 'Street Address (Spelled)',
+                                appointment: 'Appointment Date/Time'
+                              };
+
                               return (
                                 <tr key={f}>
-                                  <td style={{ fontWeight: 600, textTransform: 'capitalize' }}>{f}</td>
+                                  <td style={{ fontWeight: 600 }}>{fieldLabels[f] || f}</td>
                                   <td>{expVal}</td>
                                   <td style={{ color: isMatch ? '#34d399' : '#f87171' }}>
                                     {actVal || '«Blank»'}
