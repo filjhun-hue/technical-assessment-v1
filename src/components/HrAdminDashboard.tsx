@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { CandidateAssessmentReport } from '../types/assessment';
-import { exportReportsToCSV, syncReportsWithSupabase } from '../utils/storage';
-import { NAVIGATION_QUESTIONS } from '../data/navigationQuestions';
-import { TROUBLESHOOTING_QUESTIONS } from '../data/troubleshootingQuestions';
-import { DATA_ENTRY_RECORDINGS } from '../data/dataEntryRecordings';
+import { exportReportsToCSV } from '../utils/storage';
+import { CandidateAuditReport } from './CandidateAuditReport';
 import {
   Users,
   Search,
@@ -13,8 +11,8 @@ import {
   Eye,
   Trash2,
   FileSpreadsheet,
-  X,
-  RefreshCw
+  RefreshCw,
+  BarChart2
 } from 'lucide-react';
 
 interface HrAdminDashboardProps {
@@ -22,7 +20,9 @@ interface HrAdminDashboardProps {
   onDeleteReport: (candidateId: string) => void;
   onClearAll: () => void;
   onBackToAssessment: () => void;
-  onRefreshReports?: () => void;
+  onRefreshReports?: () => Promise<void> | void;
+  syncStatus?: 'idle' | 'syncing' | 'live' | 'offline';
+  lastSynced?: Date | null;
 }
 
 export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
@@ -30,13 +30,28 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
   onDeleteReport,
   onClearAll,
   onBackToAssessment,
-  onRefreshReports
+  onRefreshReports,
+  syncStatus = 'idle',
+  lastSynced
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PASSED' | 'REVIEW_REQUIRED' | 'NEEDS_RETEST'>('ALL');
+  const [positionFilter, setPositionFilter] = useState('ALL');
   const [selectedReport, setSelectedReport] = useState<CandidateAssessmentReport | null>(null);
-  const [detailTab, setDetailTab] = useState<'overview' | 'dataEntry' | 'quizAnswers'>('overview');
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
+
+  // ── Full-page audit view ─────────────────────────────────────────────────────
+  if (selectedReport) {
+    return (
+      <CandidateAuditReport
+        report={selectedReport}
+        onBack={() => setSelectedReport(null)}
+      />
+    );
+  }
+
+  // Available unique positions for filter
+  const availablePositions = Array.from(new Set(reports.map((r) => r.candidate.targetPosition).filter(Boolean)));
 
   // Filter logic
   const filteredReports = reports.filter((r) => {
@@ -46,15 +61,19 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
       r.candidate.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || r.overallStatus === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesPosition = positionFilter === 'ALL' || r.candidate.targetPosition === positionFilter;
+    return matchesSearch && matchesStatus && matchesPosition;
   });
 
   // Analytics Metrics
   const total = reports.length;
   const passed = reports.filter((r) => r.overallStatus === 'PASSED').length;
+  const review = reports.filter((r) => r.overallStatus === 'REVIEW_REQUIRED').length;
+  const retest = reports.filter((r) => r.overallStatus === 'NEEDS_RETEST').length;
   const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
   const avgWpm = total > 0 ? Math.round(reports.reduce((acc, r) => acc + r.typing.wpm, 0) / total) : 0;
   const avgDataEntry = total > 0 ? Math.round(reports.reduce((acc, r) => acc + r.dataEntry.accuracyScore, 0) / total) : 0;
+  const avgOverall = total > 0 ? Math.round(reports.reduce((acc, r) => acc + r.overallScore, 0) / total) : 0;
 
   return (
     <div>
@@ -64,27 +83,73 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
               <FileSpreadsheet size={24} color="#818cf8" />
-              <h1 style={{ fontSize: '1.75rem', color: '#fff' }}>HR Recruitment Portal & Candidate Hub</h1>
+              <h1 style={{ fontSize: '1.75rem', color: '#fff' }}>HR Recruitment Portal &amp; Candidate Hub</h1>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.925rem' }}>
-              Review standardized technical evaluations, verify TypingTest benchmarks, audit field-level transcription accuracy, and export candidate rosters.
+              Review standardized technical evaluations, audit field-level transcription accuracy, and export candidate rosters.
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+
+            {/* Live Sync Status Pill */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.4rem 0.85rem', borderRadius: 99,
+              background:
+                syncStatus === 'live' ? 'rgba(16,185,129,0.1)' :
+                syncStatus === 'syncing' ? 'rgba(99,102,241,0.1)' :
+                syncStatus === 'offline' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${
+                syncStatus === 'live' ? 'rgba(16,185,129,0.3)' :
+                syncStatus === 'syncing' ? 'rgba(99,102,241,0.3)' :
+                syncStatus === 'offline' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'
+              }`,
+              fontSize: '0.78rem', fontWeight: 600
+            }}>
+              {/* Status dot */}
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                background:
+                  syncStatus === 'live' ? '#10b981' :
+                  syncStatus === 'syncing' ? '#6366f1' :
+                  syncStatus === 'offline' ? '#ef4444' : '#64748b',
+                boxShadow: syncStatus === 'live' ? '0 0 0 3px rgba(16,185,129,0.2)' : 'none',
+                animation: syncStatus === 'live' ? 'pulse 2s infinite' : 'none'
+              }} />
+              <span style={{
+                color:
+                  syncStatus === 'live' ? '#34d399' :
+                  syncStatus === 'syncing' ? '#a5b4fc' :
+                  syncStatus === 'offline' ? '#f87171' : 'var(--text-dim)'
+              }}>
+                {syncStatus === 'live' ? 'Live · Connected' :
+                 syncStatus === 'syncing' ? 'Syncing...' :
+                 syncStatus === 'offline' ? 'Offline · Local only' : 'Connecting...'}
+              </span>
+              {lastSynced && syncStatus !== 'syncing' && (
+                <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+                  · {lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+            </div>
+
+            {/* Manual force-sync button */}
             <button
               type="button"
               className="btn btn-secondary"
               onClick={async () => {
-                setIsSyncing(true);
-                await syncReportsWithSupabase();
-                setIsSyncing(false);
-                if (onRefreshReports) onRefreshReports();
+                if (!onRefreshReports) return;
+                setIsForceSyncing(true);
+                await onRefreshReports();
+                setIsForceSyncing(false);
               }}
+              disabled={isForceSyncing || syncStatus === 'syncing'}
               style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-              title="Fetch latest submissions from Supabase cloud database"
+              title="Manually force a full Supabase sync"
             >
-              <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} /> {isSyncing ? 'Syncing...' : 'Sync Cloud'}
+              <RefreshCw size={15} style={{ animation: isForceSyncing ? 'spin 1s linear infinite' : 'none' }} />
+              {isForceSyncing ? 'Syncing...' : 'Force Sync'}
             </button>
 
             <button
@@ -128,6 +193,18 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
             <div className="stat-value" style={{ color: '#818cf8' }}>{avgDataEntry}%</div>
             <div className="stat-label">Avg Data Entry Accuracy</div>
           </div>
+          <div className="stat-box">
+            <div className="stat-value" style={{ color: '#60a5fa' }}>{avgOverall}%</div>
+            <div className="stat-label">Avg Composite Score</div>
+          </div>
+          <div className="stat-box">
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>{passed} Pass</span>
+              <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>{review} Review</span>
+              <span className="badge badge-danger" style={{ fontSize: '0.72rem' }}>{retest} Retest</span>
+            </div>
+            <div className="stat-label" style={{ marginTop: '0.4rem' }}>Status Breakdown</div>
+          </div>
         </div>
       </div>
 
@@ -148,19 +225,40 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status:</span>
-            <select
-              className="form-select"
-              style={{ width: 'auto', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-            >
-              <option value="ALL">All Statuses ({total})</option>
-              <option value="PASSED">Passed Benchmark</option>
-              <option value="REVIEW_REQUIRED">Review Required</option>
-              <option value="NEEDS_RETEST">Needs Retest</option>
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {availablePositions.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Role:</span>
+                <select
+                  className="form-select"
+                  style={{ width: 'auto', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
+                  value={positionFilter}
+                  onChange={(e) => setPositionFilter(e.target.value)}
+                >
+                  <option value="ALL">All Roles ({reports.length})</option>
+                  {availablePositions.map((pos) => (
+                    <option key={pos} value={pos}>
+                      {pos}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status:</span>
+              <select
+                className="form-select"
+                style={{ width: 'auto', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+              >
+                <option value="ALL">All Statuses ({total})</option>
+                <option value="PASSED">Passed Benchmark</option>
+                <option value="REVIEW_REQUIRED">Review Required</option>
+                <option value="NEEDS_RETEST">Needs Retest</option>
+              </select>
+            </div>
 
             {reports.length > 0 && (
               <button
@@ -192,13 +290,14 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
                 <th>Audio Entry</th>
                 <th>Multitask</th>
                 <th>Troubleshoot</th>
+                <th>Integrity</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
                     <Users size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
                     <div>No candidate assessment records found.</div>
                   </td>
@@ -207,12 +306,14 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
                 filteredReports.map((rep) => {
                   const isPassed = rep.overallStatus === 'PASSED';
                   const isReview = rep.overallStatus === 'REVIEW_REQUIRED';
+                  const switches = rep.candidate.unfocusCount ?? 0;
 
                   return (
                     <tr key={rep.candidate.id}>
                       <td>
                         <div style={{ fontWeight: 600, color: '#fff' }}>{rep.candidate.fullName}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rep.candidate.email}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{rep.candidate.id}</div>
                       </td>
                       <td style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
                         {rep.candidate.targetPosition}
@@ -237,20 +338,45 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
                           ({rep.typing.accuracy}%)
                         </span>
                       </td>
-                      <td>{rep.navigation.percentage}%</td>
-                      <td>{rep.dataEntry.accuracyScore}%</td>
-                      <td>{rep.multitasking.overallScore}%</td>
-                      <td>{rep.troubleshooting.percentage}%</td>
+                      <td>
+                        <span style={{ color: rep.navigation.percentage >= 70 ? '#34d399' : '#f87171' }}>
+                          {rep.navigation.percentage}%
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ color: rep.dataEntry.accuracyScore >= 75 ? '#34d399' : '#f87171' }}>
+                          {rep.dataEntry.accuracyScore}%
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ color: rep.multitasking.overallScore >= 60 ? '#34d399' : '#f87171' }}>
+                          {rep.multitasking.overallScore}%
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ color: rep.troubleshooting.percentage >= 70 ? '#34d399' : '#f87171' }}>
+                          {rep.troubleshooting.percentage}%
+                        </span>
+                      </td>
+                      <td>
+                        {switches === 0 ? (
+                          <span style={{ fontSize: '0.75rem', color: '#34d399' }}>✓ Clean</span>
+                        ) : switches >= 3 ? (
+                          <span style={{ fontSize: '0.75rem', color: '#f87171' }}>⚠ {switches}× switches</span>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: '#fcd34d' }}>{switches}× switch</span>
+                        )}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                           <button
                             type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                            className="btn btn-primary"
+                            style={{ padding: '0.35rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                             onClick={() => setSelectedReport(rep)}
-                            title="Inspect Candidate Submission"
+                            title="Open Full Audit Report"
                           >
-                            <Eye size={14} /> Audit
+                            <BarChart2 size={13} /> Audit
                           </button>
                           <button
                             type="button"
@@ -271,257 +397,6 @@ export const HrAdminDashboard: React.FC<HrAdminDashboardProps> = ({
           </table>
         </div>
       </div>
-
-      {/* Candidate Audit Modal */}
-      {selectedReport && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '1.5rem'
-          }}
-        >
-          <div
-            className="glass-panel"
-            style={{
-              maxWidth: '900px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '2rem',
-              background: '#0f172a'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-              <div>
-                <h2 style={{ fontSize: '1.5rem', color: '#fff' }}>
-                  Candidate Audit: {selectedReport.candidate.fullName}
-                </h2>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  ID: {selectedReport.candidate.id} • Applied For: {selectedReport.candidate.targetPosition} • Completed: {new Date(selectedReport.generatedAt).toLocaleString()}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ padding: '0.4rem 0.6rem' }}
-                onClick={() => setSelectedReport(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Audit Modal Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
-              <button
-                type="button"
-                className={`btn ${detailTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-                onClick={() => setDetailTab('overview')}
-              >
-                Summary & Typing
-              </button>
-              <button
-                type="button"
-                className={`btn ${detailTab === 'dataEntry' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-                onClick={() => setDetailTab('dataEntry')}
-              >
-                Audio Data Entry Diff ({selectedReport.dataEntry.accuracyScore}%)
-              </button>
-              <button
-                type="button"
-                className={`btn ${detailTab === 'quizAnswers' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-                onClick={() => setDetailTab('quizAnswers')}
-              >
-                Questionnaire Answers
-              </button>
-            </div>
-
-            {/* Tab Content 1: Overview */}
-            {detailTab === 'overview' && (
-              <div>
-                <div className="stats-grid" style={{ margin: '0 0 1.5rem 0' }}>
-                  <div className="stat-box">
-                    <div className="stat-value">{selectedReport.overallScore}%</div>
-                    <div className="stat-label">Composite Score</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-value">{selectedReport.typing.wpm}</div>
-                    <div className="stat-label">Typing WPM</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-value">{selectedReport.typing.accuracy}%</div>
-                    <div className="stat-label">Typing Accuracy</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-value">{selectedReport.candidate.unfocusCount || 0}</div>
-                    <div className="stat-label">Tab Switches</div>
-                  </div>
-                </div>
-
-                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '0.95rem', color: '#fff', marginBottom: '0.5rem' }}>Typing Test Submission Details</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
-                    <div>Duration: <strong>{selectedReport.typing.durationSeconds}s</strong></div>
-                    <div>Total Errors: <strong>{selectedReport.typing.errors}</strong></div>
-                    <div>Characters Per Minute: <strong>{selectedReport.typing.cpm}</strong></div>
-                    <div>External Verified: <strong>{selectedReport.typing.externalScoreSubmitted ? 'Yes (TypingTest.com)' : 'Built-in Engine'}</strong></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tab Content 2: Data Entry Field-by-Field Diff */}
-            {detailTab === 'dataEntry' && (
-              <div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Comparison between candidate input vs expected ground truth across all 4 audio recordings.
-                </p>
-
-                {DATA_ENTRY_RECORDINGS.map((rec) => {
-                  const candidateRec = selectedReport.dataEntry.candidateRecords[rec.id] || {};
-                  const expected = rec.expectedData;
-                  const replaysCount = selectedReport.dataEntry.replays[rec.id] || 0;
-
-                  return (
-                    <div
-                      key={rec.id}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '8px',
-                        padding: '1.25rem',
-                        marginBottom: '1rem'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                        <strong style={{ color: '#a5b4fc' }}>{rec.title}</strong>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Audio Replays: {replaysCount}x</span>
-                      </div>
-
-                      <div className="data-table-wrapper">
-                        <table className="data-table" style={{ fontSize: '0.825rem' }}>
-                          <thead>
-                            <tr>
-                              <th>Field</th>
-                              <th>Expected</th>
-                              <th>Candidate Input</th>
-                              <th>Match Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(['customerName', 'company', 'phoneNumber', 'email', 'streetAddress', 'appointment'] as (keyof typeof expected)[]).map((f) => {
-                              const expVal = expected[f];
-                              const actVal = candidateRec[f] || '';
-                              const isMatch = actVal.trim().toLowerCase() === expVal.trim().toLowerCase();
-
-                              const fieldLabels: Record<string, string> = {
-                                customerName: 'Prospect Full Name',
-                                company: 'Company Name',
-                                phoneNumber: 'Direct Phone (Corrected)',
-                                email: 'Work Email (Corrected)',
-                                streetAddress: 'Street Address (Spelled)',
-                                appointment: 'Appointment Date/Time'
-                              };
-
-                              return (
-                                <tr key={f}>
-                                  <td style={{ fontWeight: 600 }}>{fieldLabels[f] || f}</td>
-                                  <td>{expVal}</td>
-                                  <td style={{ color: isMatch ? '#34d399' : '#f87171' }}>
-                                    {actVal || '«Blank»'}
-                                  </td>
-                                  <td>
-                                    {isMatch ? (
-                                      <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>Exact</span>
-                                    ) : (
-                                      <span className="badge badge-danger" style={{ fontSize: '0.65rem' }}>Mismatch</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Tab Content 3: Quiz Answers */}
-            {detailTab === 'quizAnswers' && (
-              <div>
-                <h4 style={{ fontSize: '1rem', color: '#fff', marginBottom: '0.75rem' }}>
-                  Computer Navigation Questionnaire ({selectedReport.navigation.percentage}%)
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
-                  {NAVIGATION_QUESTIONS.map((q) => {
-                    const chosen = selectedReport.navigation.answers[q.id];
-                    const isCorrect = chosen === q.correctOptionId;
-
-                    return (
-                      <div
-                        key={q.id}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          borderRadius: '6px',
-                          background: isCorrect ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-                          border: isCorrect ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, color: '#fff', marginBottom: '0.2rem' }}>{q.question}</div>
-                        <div style={{ color: isCorrect ? '#34d399' : '#f87171' }}>
-                          Candidate Selected: {chosen || 'None'} • Correct: {q.correctOptionId}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <h4 style={{ fontSize: '1rem', color: '#fff', marginBottom: '0.75rem' }}>
-                  Troubleshooting Test ({selectedReport.troubleshooting.percentage}%)
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {TROUBLESHOOTING_QUESTIONS.map((q) => {
-                    const chosen = selectedReport.troubleshooting.answers[q.id];
-                    const isCorrect = chosen === q.correctOptionId;
-
-                    return (
-                      <div
-                        key={q.id}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          borderRadius: '6px',
-                          background: isCorrect ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-                          border: isCorrect ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, color: '#fff', marginBottom: '0.2rem' }}>{q.question}</div>
-                        <div style={{ color: isCorrect ? '#34d399' : '#f87171' }}>
-                          Candidate Selected: {chosen || 'None'} • Correct: {q.correctOptionId}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

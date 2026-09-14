@@ -258,6 +258,8 @@ export const TypingTest: React.FC<TypingTestProps> = ({ onComplete }) => {
             value={inputVal}
             onChange={handleInputChange}
             disabled={isFinished}
+            autoComplete="off"
+            spellCheck={false}
             placeholder={
               !isActive && !isFinished
                 ? 'Click here and start typing the text above to begin the 60s timer...'

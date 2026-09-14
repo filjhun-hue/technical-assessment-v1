@@ -12,7 +12,7 @@ export const CandidateRegistration: React.FC<CandidateRegistrationProps> = ({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [targetPosition, setTargetPosition] = useState('Customer Support Representative');
+  const [targetPosition, setTargetPosition] = useState('Outbound Telemarketer / Sales Representative');
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -101,7 +101,7 @@ export const CandidateRegistration: React.FC<CandidateRegistrationProps> = ({
                 3. Audio Data Entry
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Listen to 4 audio calls and transcribe names, emails, dates & IDs accurately.
+                Listen to 3 audio calls and transcribe names, emails, dates & IDs accurately.
               </div>
             </div>
 
@@ -110,7 +110,7 @@ export const CandidateRegistration: React.FC<CandidateRegistrationProps> = ({
                 4. Multitasking Simulation
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Handle simultaneous live customer chats, priority tickets & verifications.
+                Live cold call objection rebuttals, auto-dialer call dispositions & calendar bookings.
               </div>
             </div>
 
@@ -197,6 +197,9 @@ export const CandidateRegistration: React.FC<CandidateRegistrationProps> = ({
                 value={targetPosition}
                 onChange={(e) => setTargetPosition(e.target.value)}
               >
+                <option value="Outbound Telemarketer / Sales Representative">Outbound Telemarketer / Sales Representative</option>
+                <option value="BDR / SDR (Business Development Representative)">BDR / SDR (Business Development Representative)</option>
+                <option value="Outbound Appointment Setter">Outbound Appointment Setter</option>
                 <option value="Customer Support Representative">Customer Support Representative</option>
                 <option value="Technical Support Specialist">Technical Support Specialist</option>
                 <option value="Data Entry Specialist">Data Entry Specialist</option>

@@ -1,154 +1,296 @@
-export interface ChatItem {
+export interface ObjectionItem {
   id: string;
-  sender: string;
-  message: string;
+  prospect: string;
+  title: string;
+  objection: string;
+  category: 'Competitor' | 'Brush-Off' | 'No Budget' | 'Timing' | 'Skeptical';
+  urgency: 'medium' | 'high';
   options: {
     id: string;
     text: string;
     isBest: boolean;
   }[];
-  urgency: 'medium' | 'high';
 }
 
-export interface TicketItem {
+export type DispositionType = 'Meeting' | 'Callback' | 'Gatekeeper' | 'Voicemail' | 'DNC';
+
+export interface DispositionItem {
   id: string;
-  code: string;
-  title: string;
-  category: 'Billing' | 'Technical' | 'Account' | 'Shipping';
-  correctPriority: 'Low' | 'Medium' | 'Urgent';
-  summary: string;
+  leadCode: string;
+  contactName: string;
+  company: string;
+  callSummary: string;
+  correctDisposition: DispositionType;
 }
 
-export interface VerificationItem {
+export interface AppointmentSlotChoice {
   id: string;
-  orderId: string;
-  customerName: string;
-  declaredAmount: string;
-  ledgerAmount: string;
-  isMatch: boolean;
+  label: string;
+  isCorrect: boolean;
 }
 
-export const MULTITASKING_CHATS: ChatItem[] = [
+export interface AppointmentSlotItem {
+  id: string;
+  prospectName: string;
+  company: string;
+  requestedWindow: string;
+  slots: AppointmentSlotChoice[];
+}
+
+// Backward compatibility types
+export type ChatItem = ObjectionItem;
+export type TicketItem = DispositionItem;
+export type VerificationItem = AppointmentSlotItem;
+
+export const MULTITASKING_OBJECTIONS: ObjectionItem[] = [
   {
-    id: 'chat-1',
-    sender: 'Client: Marcus Vance',
-    message: 'I have been waiting 15 minutes for my reset code and my webinar begins in 5 minutes!',
+    id: 'obj-1',
+    prospect: 'Karen Bradley',
+    title: 'VP of Operations, Titan Logistics',
+    objection: "We are already locked into an annual contract with another vendor and we're totally satisfied.",
+    category: 'Competitor',
     urgency: 'high',
     options: [
-      { id: 'c1-1', text: 'You should have requested it earlier.', isBest: false },
-      { id: 'c1-2', text: 'I understand the urgency! I am sending a direct one-time passcode to your mobile right now.', isBest: true },
-      { id: 'c1-3', text: 'Please submit a formal ticket and wait 24 hours.', isBest: false }
+      {
+        id: 'o1-1',
+        text: 'Their customer service is known to be terrible. You should break your contract and switch to us.',
+        isBest: false
+      },
+      {
+        id: 'o1-2',
+        text: 'Completely understand, Karen! Most of our current partners were with them too. We actually aren\'t asking you to switch—we serve as a backup overflow provider when your primary vendor is at capacity. Would you be open to a 10-minute rate comparison next Tuesday?',
+        isBest: true
+      },
+      {
+        id: 'o1-3',
+        text: 'No problem at all, I will remove your name from our calling list immediately.',
+        isBest: false
+      }
     ]
   },
   {
-    id: 'chat-2',
-    sender: 'Client: Elena Rostova',
-    message: 'Can you tell me if my invoice #9802 was processed or if the payment failed?',
+    id: 'obj-2',
+    prospect: 'Marcus Sterling',
+    title: 'Director of Technology, Apex Cloud',
+    objection: "I don't have time for cold calls. Just email me your sales deck and pricing sheet and I'll look it over.",
+    category: 'Brush-Off',
     urgency: 'medium',
     options: [
-      { id: 'c2-1', text: 'I am checking invoice #9802 in our billing ledger right now for you.', isBest: true },
-      { id: 'c2-2', text: 'Call the billing department tomorrow morning.', isBest: false },
-      { id: 'c2-3', text: 'Ask your bank directly instead.', isBest: false }
+      {
+        id: 'o2-1',
+        text: 'I\'d be glad to send that over, Marcus! So I don\'t flood your inbox with generic slides, are you currently more focused on reducing cloud infrastructure cost or automating server backups?',
+        isBest: true
+      },
+      {
+        id: 'o2-2',
+        text: 'Our company policy strictly prohibits emailing any information unless you first book a 30-minute demonstration.',
+        isBest: false
+      },
+      {
+        id: 'o2-3',
+        text: 'Sure thing, I\'ll send over our 50-page brochure right away and call you back in 15 minutes to review it.',
+        isBest: false
+      }
     ]
   },
   {
-    id: 'chat-3',
-    sender: 'Client: David Kim',
-    message: 'Our company firewall is blocking port 443 during conference calls. Do you have documentation?',
-    urgency: 'medium',
-    options: [
-      { id: 'c3-1', text: 'Here is our Network Security Whitelist Guide and IP ranges for your IT team.', isBest: true },
-      { id: 'c3-2', text: 'Just disable your entire company firewall completely.', isBest: false },
-      { id: 'c3-3', text: 'Port 443 is not our problem.', isBest: false }
-    ]
-  },
-  {
-    id: 'chat-4',
-    sender: 'Client: Sarah Jenkins',
-    message: 'I received the wrong package size in order #5521. Can I get an immediate replacement?',
+    id: 'obj-3',
+    prospect: 'David Chen',
+    title: 'CFO, Sterling Healthcare Group',
+    objection: "Our budget is completely frozen until Q4. There is zero money to spend on new software right now.",
+    category: 'No Budget',
     urgency: 'high',
     options: [
-      { id: 'c4-1', text: 'Return everything and buy it again at full price.', isBest: false },
-      { id: 'c4-2', text: 'I sincerely apologize! I have generated a prepaid return label and expedited the replacement order.', isBest: true },
-      { id: 'c4-3', text: 'Mistakes happen, wait until next week.', isBest: false }
+      {
+        id: 'o3-1',
+        text: 'Can you speak with your executive committee to get an emergency budget exception for this?',
+        isBest: false
+      },
+      {
+        id: 'o3-2',
+        text: 'Understood, David—most CFOs we speak with are guarding capital closely right now. We wouldn\'t expect any financial commitment today. We are sharing preliminary ROI models so leaders have numbers ready when planning reopens. Would Thursday at 2:00 PM work for a brief 10-minute briefing?',
+        isBest: true
+      },
+      {
+        id: 'o3-3',
+        text: 'You don\'t need budget because our tool pays for itself immediately on day one.',
+        isBest: false
+      }
+    ]
+  },
+  {
+    id: 'obj-4',
+    prospect: 'Rachel Vance',
+    title: 'Head of People & HR, Nexus Media',
+    objection: "I'm literally stepping into a company all-hands meeting right now, I have zero seconds to talk.",
+    category: 'Timing',
+    urgency: 'high',
+    options: [
+      {
+        id: 'o4-1',
+        text: 'Wait, please don\'t hang up! This will only take 60 seconds, let me just explain our main feature.',
+        isBest: false
+      },
+      {
+        id: 'o4-2',
+        text: 'Understood, Rachel! I caught you completely by surprise. Go ahead into your meeting—can I reach back out tomorrow morning at 9:15 AM before your schedule fills up?',
+        isBest: true
+      },
+      {
+        id: 'o4-3',
+        text: 'Could you just put me on speakerphone while you attend your all-hands meeting?',
+        isBest: false
+      }
+    ]
+  },
+  {
+    id: 'obj-5',
+    prospect: 'Anthony Russo',
+    title: 'Managing Director, Russo Manufacturing',
+    objection: "How did you get my direct phone number? Who authorized you to contact me?",
+    category: 'Skeptical',
+    urgency: 'medium',
+    options: [
+      {
+        id: 'o5-1',
+        text: 'I appreciate you asking, Anthony. I noticed your recent regional plant expansion on LinkedIn and retrieved your verified corporate desk line via our B2B directory. If you\'d prefer I delete this line, I will do so immediately—or I can share in 30 seconds why we reached out?',
+        isBest: true
+      },
+      {
+        id: 'o5-2',
+        text: 'It\'s public information on the internet, so anyone in our company has legal authorization to call you.',
+        isBest: false
+      },
+      {
+        id: 'o5-3',
+        text: 'We buy marketing lists online and your phone number happened to be on today\'s dialer batch.',
+        isBest: false
+      }
     ]
   }
 ];
 
-export const MULTITASKING_TICKETS: TicketItem[] = [
+export const MULTITASKING_DISPOSITIONS: DispositionItem[] = [
   {
-    id: 'tkt-1',
-    code: 'TKT-802',
-    title: 'Executive Boardroom Video Call Outage',
-    category: 'Technical',
-    correctPriority: 'Urgent',
-    summary: 'C-Suite scheduled meeting in progress; dialer connectivity severed.'
+    id: 'disp-1',
+    leadCode: 'LEAD-401',
+    contactName: 'Gregory Scott',
+    company: 'Scott Industrial Corp',
+    callSummary: "Prospect shouted: 'Stop calling this number! Remove me from your calling list immediately or I will report you to the FTC!'",
+    correctDisposition: 'DNC'
   },
   {
-    id: 'tkt-2',
-    code: 'TKT-803',
-    title: 'Monthly Recurring Invoice Receipt Copy',
-    category: 'Billing',
-    correctPriority: 'Low',
-    summary: 'User requests PDF copy of last month regular receipt for tax records.'
+    id: 'disp-2',
+    leadCode: 'LEAD-402',
+    contactName: 'Amanda Hughes',
+    company: 'Vanguard Medical Labs',
+    callSummary: "Prospect answered: 'I'm interested, but I'm driving right now. Can your senior account exec call my desk tomorrow at 3:30 PM EST?'",
+    correctDisposition: 'Callback'
   },
   {
-    id: 'tkt-3',
-    code: 'TKT-804',
-    title: 'Multiple Login Failures & Password Locked',
-    category: 'Account',
-    correctPriority: 'Medium',
-    summary: 'Sales manager locked out after 5 invalid attempts from hotel Wi-Fi.'
+    id: 'disp-3',
+    leadCode: 'LEAD-403',
+    contactName: 'Evelyn Marsh',
+    company: 'Summit Capital Partners',
+    callSummary: "Receptionist answered: 'Ms. Marsh is out of the office until Wednesday. All vendor screening is handled through her executive assistant on Thursday mornings.'",
+    correctDisposition: 'Gatekeeper'
   },
   {
-    id: 'tkt-4',
-    code: 'TKT-805',
-    title: 'Warehouse Label Printer Firmware Upgrade',
-    category: 'Technical',
-    correctPriority: 'Low',
-    summary: 'Routine maintenance scheduled for weekend downtime.'
+    id: 'disp-4',
+    leadCode: 'LEAD-404',
+    contactName: 'Brian Kowalski',
+    company: 'Kowalski Logistics Inc',
+    callSummary: "Prospect confirmed: 'Yes, 15 minutes this Friday at 10:00 AM works. Send the meeting invite and video link to my corporate email.'",
+    correctDisposition: 'Meeting'
   },
   {
-    id: 'tkt-5',
-    code: 'TKT-806',
-    title: 'Suspected Fraud: Duplicate $4,200 Wire Transfer Request',
-    category: 'Billing',
-    correctPriority: 'Urgent',
-    summary: 'Suspicious overseas charge initiated without two-factor authentication.'
+    id: 'disp-5',
+    leadCode: 'LEAD-405',
+    contactName: 'Stephanie Clark',
+    company: 'BlueWave Digital',
+    callSummary: "Dialer connected, 5 rings, automated system played: 'The person you are trying to reach is unavailable. Please record your message after the tone.'",
+    correctDisposition: 'Voicemail'
+  },
+  {
+    id: 'disp-6',
+    leadCode: 'LEAD-406',
+    contactName: 'Thomas Wright',
+    company: 'Wright Construction Group',
+    callSummary: "Prospect stated firmly: 'Take my name and business off your dialer permanently. Do not ever contact us again.'",
+    correctDisposition: 'DNC'
   }
 ];
 
-export const MULTITASKING_VERIFICATIONS: VerificationItem[] = [
+export const MULTITASKING_APPOINTMENTS: AppointmentSlotItem[] = [
   {
-    id: 'ver-1',
-    orderId: 'ORD-9842',
-    customerName: 'Jonathan Reed',
-    declaredAmount: '$249.00',
-    ledgerAmount: '$249.00',
-    isMatch: true
+    id: 'appt-1',
+    prospectName: 'Elena Rostova',
+    company: 'BioDynamics Inc',
+    requestedWindow: 'Tuesday afternoon between 2:00 PM and 4:00 PM EST',
+    slots: [
+      { id: 's1-1', label: 'Tuesday 11:00 AM EST', isCorrect: false },
+      { id: 's1-2', label: 'Tuesday 3:00 PM EST', isCorrect: true },
+      { id: 's1-3', label: 'Thursday 3:00 PM EST', isCorrect: false }
+    ]
   },
   {
-    id: 'ver-2',
-    orderId: 'ORD-9843',
-    customerName: 'Patricia Gomez',
-    declaredAmount: '$1,120.00',
-    ledgerAmount: '$1,210.00',
-    isMatch: false
+    id: 'appt-2',
+    prospectName: 'Marcus Vance',
+    company: 'Titan Global Freight',
+    requestedWindow: 'Friday morning before 11:00 AM CST (12:00 PM EST)',
+    slots: [
+      { id: 's2-1', label: 'Friday 9:30 AM CST (10:30 AM EST)', isCorrect: true },
+      { id: 's2-2', label: 'Friday 1:30 PM CST (2:30 PM EST)', isCorrect: false },
+      { id: 's2-3', label: 'Thursday 9:30 AM CST (10:30 AM EST)', isCorrect: false }
+    ]
   },
   {
-    id: 'ver-3',
-    orderId: 'ORD-9844',
-    customerName: 'Arthur Pendelton',
-    declaredAmount: '$89.50',
-    ledgerAmount: '$89.50',
-    isMatch: true
+    id: 'appt-3',
+    prospectName: 'Dr. Sarah Jenkins',
+    company: 'Valley Health Network',
+    requestedWindow: 'Monday during lunch hour: 12:00 PM - 1:30 PM EST',
+    slots: [
+      { id: 's3-1', label: 'Monday 9:00 AM EST', isCorrect: false },
+      { id: 's3-2', label: 'Monday 12:30 PM EST', isCorrect: true },
+      { id: 's3-3', label: 'Tuesday 12:30 PM EST', isCorrect: false }
+    ]
   },
   {
-    id: 'ver-4',
-    orderId: 'ORD-9845',
-    customerName: 'Nathalie Dupont',
-    declaredAmount: '$450.00',
-    ledgerAmount: '$405.00',
-    isMatch: false
+    id: 'appt-4',
+    prospectName: 'Liam O\'Connor',
+    company: 'FinTech Secure',
+    requestedWindow: 'Thursday late afternoon after 4:00 PM PST (7:00 PM EST)',
+    slots: [
+      { id: 's4-1', label: 'Thursday 2:00 PM PST', isCorrect: false },
+      { id: 's4-2', label: 'Friday 4:30 PM PST', isCorrect: false },
+      { id: 's4-3', label: 'Thursday 4:30 PM PST', isCorrect: true }
+    ]
+  },
+  {
+    id: 'appt-5',
+    prospectName: 'Natalie Dupont',
+    company: 'Omni Retail Solutions',
+    requestedWindow: 'Wednesday early morning between 8:30 AM and 10:00 AM EST',
+    slots: [
+      { id: 's5-1', label: 'Wednesday 9:15 AM EST', isCorrect: true },
+      { id: 's5-2', label: 'Wednesday 11:15 AM EST', isCorrect: false },
+      { id: 's5-3', label: 'Thursday 9:15 AM EST', isCorrect: false }
+    ]
+  },
+  {
+    id: 'appt-6',
+    prospectName: 'Arthur Pendelton',
+    company: 'Pendelton Materials',
+    requestedWindow: 'Friday early afternoon between 1:00 PM and 2:30 PM EST',
+    slots: [
+      { id: 's6-1', label: 'Friday 11:00 AM EST', isCorrect: false },
+      { id: 's6-2', label: 'Friday 1:45 PM EST', isCorrect: true },
+      { id: 's6-3', label: 'Monday 1:45 PM EST', isCorrect: false }
+    ]
   }
 ];
+
+// Aliases for backward compatibility
+export const MULTITASKING_CHATS = MULTITASKING_OBJECTIONS;
+export const MULTITASKING_TICKETS = MULTITASKING_DISPOSITIONS;
+export const MULTITASKING_VERIFICATIONS = MULTITASKING_APPOINTMENTS;

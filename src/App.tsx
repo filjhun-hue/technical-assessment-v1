@@ -20,11 +20,225 @@ import { CandidateResults } from './components/CandidateResults';
 import { HrAdminDashboard } from './components/HrAdminDashboard';
 import { computeOverallAssessment } from './utils/grading';
 import { saveAssessmentReport, getAllAssessmentReports, syncReportsWithSupabase } from './utils/storage';
+import { getSupabaseClient, fetchAssessmentsFromSupabase } from './utils/supabaseClient';
+import { Lock, Shield, Eye, EyeOff } from 'lucide-react';
 
+// ─── HR Portal PIN Gate ───────────────────────────────────────────────────────
+// Change this to your desired PIN. Keep it secret — share only with HR staff.
+const HR_PORTAL_PIN = '291847';
+
+const HrPinGate: React.FC<{ onUnlock: () => void; onCancel: () => void }> = ({ onUnlock, onCancel }) => {
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [error, setError] = useState('');
+  const [attempts, setAttempts] = useState(0);
+  const [locked, setLocked] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (locked) return;
+
+    if (pin === HR_PORTAL_PIN) {
+      setError('');
+      onUnlock();
+    } else {
+      const next = attempts + 1;
+      setAttempts(next);
+      setPin('');
+      if (next >= 5) {
+        setLocked(true);
+        setError('Too many failed attempts. Access temporarily locked.');
+      } else {
+        setError(`Incorrect PIN. ${5 - next} attempt${5 - next === 1 ? '' : 's'} remaining.`);
+      }
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'linear-gradient(135deg, #0a0f1e 0%, #0f172a 50%, #0a0f1e 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 9999, padding: '1.5rem'
+    }}>
+      <div className="glass-panel" style={{ maxWidth: '400px', width: '100%', padding: '2.5rem', textAlign: 'center' }}>
+        <div style={{
+          width: '64px', height: '64px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #4f46e5, #818cf8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 1.5rem'
+        }}>
+          <Lock size={28} color="#fff" />
+        </div>
+
+        <h2 style={{ fontSize: '1.5rem', color: '#fff', marginBottom: '0.5rem' }}>HR Portal Access</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '2rem' }}>
+          This area is restricted to HR staff only. Enter your access PIN to continue.
+        </p>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPin ? 'text' : 'password'}
+              className="form-input"
+              placeholder="Enter 6-digit PIN"
+              value={pin}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setPin(v);
+                setError('');
+              }}
+              maxLength={6}
+              disabled={locked}
+              autoFocus
+              style={{ textAlign: 'center', letterSpacing: '0.35em', fontSize: '1.25rem', paddingRight: '3rem' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPin(!showPin)}
+              style={{
+                position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '0'
+              }}
+              tabIndex={-1}
+            >
+              {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '0.6rem 0.9rem', borderRadius: '6px',
+              background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#f87171', fontSize: '0.85rem'
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={pin.length < 6 || locked}
+            style={{ width: '100%', padding: '0.75rem' }}
+          >
+            {locked ? 'Access Locked' : 'Unlock Portal'}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onCancel}
+            style={{ width: '100%', padding: '0.65rem', fontSize: '0.85rem' }}
+          >
+            ← Back to Assessment
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
 export const App: React.FC = () => {
+  // Hash-based route detection
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const [hrUnlocked, setHrUnlocked] = useState(false);
+
+  useEffect(() => {
+    const onHashChange = () => setCurrentHash(window.location.hash);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const isHrRoute = currentHash === '#/hrportal';
+  const showHrPortal = isHrRoute && hrUnlocked;
+  const showPinGate = isHrRoute && !hrUnlocked;
+
+  const [hrSyncStatus, setHrSyncStatus] = useState<'idle' | 'syncing' | 'live' | 'offline'>('idle');
+  const [hrLastSynced, setHrLastSynced] = useState<Date | null>(null);
+
+  // Auto-fetch from Supabase + subscribe to realtime whenever HR portal opens
+  useEffect(() => {
+    if (!showHrPortal) {
+      setHrSyncStatus('idle');
+      return;
+    }
+
+    let realtimeChannel: ReturnType<NonNullable<ReturnType<typeof getSupabaseClient>>['channel']> | null = null;
+
+    const initPortal = async () => {
+      // Step 1: load localStorage immediately so the list shows something right away
+      const local = getAllAssessmentReports();
+      setReports(local);
+
+      // Step 2: fetch from Supabase and merge
+      setHrSyncStatus('syncing');
+      try {
+        const remote = await fetchAssessmentsFromSupabase();
+        if (remote.length > 0) {
+          // Merge: remote takes precedence for same IDs, keep any local-only ones
+          const map = new Map<string, CandidateAssessmentReport>();
+          local.forEach(r => map.set(r.candidate.id, r));
+          remote.forEach(r => map.set(r.candidate.id, r));
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+          );
+          setReports(merged);
+          // Persist merged list locally
+          localStorage.setItem('tech_assessment_hr_reports_v1', JSON.stringify(merged));
+        }
+        setHrLastSynced(new Date());
+
+        // Step 3: subscribe to realtime changes
+        const client = getSupabaseClient();
+        if (client) {
+          realtimeChannel = client
+            .channel('hr-portal-live')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'candidate_assessments' },
+              async () => {
+                // Re-fetch full list on any change
+                const updated = await fetchAssessmentsFromSupabase();
+                if (updated.length > 0) {
+                  setReports(prev => {
+                    const m = new Map<string, CandidateAssessmentReport>();
+                    prev.forEach(r => m.set(r.candidate.id, r));
+                    updated.forEach(r => m.set(r.candidate.id, r));
+                    return Array.from(m.values()).sort(
+                      (a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+                    );
+                  });
+                  setHrLastSynced(new Date());
+                }
+              }
+            )
+            .subscribe((status) => {
+              setHrSyncStatus(status === 'SUBSCRIBED' ? 'live' : 'offline');
+            });
+        } else {
+          setHrSyncStatus('offline');
+        }
+      } catch {
+        setHrSyncStatus('offline');
+      }
+    };
+
+    initPortal();
+
+    return () => {
+      // Unsubscribe when portal closes
+      if (realtimeChannel) {
+        const client = getSupabaseClient();
+        client?.removeChannel(realtimeChannel);
+      }
+      setHrSyncStatus('idle');
+    };
+  }, [showHrPortal]);
+
   const [currentSection, setCurrentSection] = useState<TestSectionId>('onboarding');
   const [completedSections, setCompletedSections] = useState<Set<TestSectionId>>(new Set());
-  const [isAdminView, setIsAdminView] = useState(false);
 
   // Candidate Data State
   const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
@@ -52,7 +266,7 @@ export const App: React.FC = () => {
           fullName: 'Jordan Miller',
           email: 'jordan.miller@example.com',
           phone: '(555) 349-8812',
-          targetPosition: 'Technical Support Specialist',
+          targetPosition: 'Outbound Telemarketer / Sales Representative',
           startedAt: new Date(Date.now() - 3600000).toISOString(),
           completedAt: new Date(Date.now() - 1800000).toISOString(),
           unfocusCount: 1
@@ -76,29 +290,31 @@ export const App: React.FC = () => {
         dataEntry: {
           candidateRecords: {
             'rec-1': { customerName: 'Johnathan Davies', company: 'Vanguard Logistics', phoneNumber: '555-684-2190', email: 'j.davies@vanguardlogistics.com', streetAddress: '420 Wyckoff Avenue, Suite 350', appointment: 'September 18, 2026, 2:00 PM' },
-            'rec-2': { customerName: 'Meredith Calhoun', company: 'Apex BioSystems', phoneNumber: '555-704-5829', email: 'mcalhoun@apexbio.org', streetAddress: '1250 Pszczolka Boulevard, Building B', appointment: 'October 05, 2026, 11:30 AM' },
-            'rec-3': { customerName: 'Gregory Braithwaite', company: 'Sterling Financial Partners', phoneNumber: '555-916-4382', email: 'g.braithwaite@sterlingpartners.net', streetAddress: '950 Ksiezopolski Drive, Suite 500', appointment: 'November 12, 2026, 4:15 PM' },
-            'rec-4': { customerName: 'Stephanie Vandeberg', company: 'CloudScale Solutions', phoneNumber: '555-831-6724', email: 'svandeberg@cloudscale.io', streetAddress: '310 Queuencelle Court, Floor 4', appointment: 'December 02, 2026, 9:00 AM' }
+            'rec-2': { customerName: 'Marcus Calhoun', company: 'Apex BioSystems', phoneNumber: '555-704-5829', email: 'm.calhoun@apexbio.org', streetAddress: '1250 Belmont Boulevard, Building B', appointment: 'October 05, 2026, 11:30 AM' },
+            'rec-3': { customerName: 'Gregory Braithwaite', company: 'Sterling Financial Partners', phoneNumber: '555-916-4382', email: 'g.braithwaite@sterlingpartners.net', streetAddress: '950 Kensington Drive, Suite 500', appointment: 'November 12, 2026, 4:15 PM' }
           },
-          replays: { 'rec-1': 1, 'rec-2': 1, 'rec-3': 2, 'rec-4': 1 },
+          replays: { 'rec-1': 1, 'rec-2': 1, 'rec-3': 2 },
           accuracyScore: 100,
-          totalFields: 24,
-          correctFields: 24,
+          totalFields: 18,
+          correctFields: 18,
           fieldErrors: [],
           completed: true,
-          timeSpentSeconds: 310
+          timeSpentSeconds: 240
         },
         multitasking: {
-          chatResolved: 4,
-          chatTotal: 4,
-          ticketsProcessed: 5,
-          ticketsTotal: 5,
-          verificationsDone: 4,
-          verificationsTotal: 4,
-          accuracyPercentage: 92,
+          chatResolved: 5,
+          chatTotal: 5,
+          ticketsProcessed: 6,
+          ticketsTotal: 6,
+          verificationsDone: 6,
+          verificationsTotal: 6,
+          accuracyPercentage: 94,
           avgResponseTimeSec: 68,
-          overallScore: 94,
-          completed: true
+          overallScore: 95,
+          completed: true,
+          objectionsResolved: 5,
+          dispositionsHandled: 6,
+          appointmentsBooked: 6
         },
         troubleshooting: {
           answers: { 'ts-1': 'B', 'ts-2': 'B', 'ts-3': 'C', 'ts-4': 'C', 'ts-5': 'B', 'ts-6': 'A', 'ts-7': 'B', 'ts-8': 'C', 'ts-9': 'B', 'ts-10': 'A', 'ts-11': 'B' },
@@ -122,7 +338,7 @@ export const App: React.FC = () => {
   // Track window blur / tab switches during active test
   useEffect(() => {
     const handleBlur = () => {
-      if (candidate && currentSection !== 'onboarding' && currentSection !== 'results' && !isAdminView) {
+      if (candidate && currentSection !== 'onboarding' && currentSection !== 'results' && !isHrRoute) {
         setUnfocusCount((prev) => {
           const next = prev + 1;
           setCandidate((cand) => (cand ? { ...cand, unfocusCount: next } : null));
@@ -133,7 +349,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
-  }, [candidate, currentSection, isAdminView]);
+  }, [candidate, currentSection, isHrRoute]);
 
   // Handlers for candidate transitions
   const handleStartAssessment = (newCandidate: CandidateInfo) => {
@@ -175,7 +391,7 @@ export const App: React.FC = () => {
       fullName: 'Jordan Miller',
       email: 'jordan.miller@example.com',
       phone: '(555) 349-8812',
-      targetPosition: 'Technical Support Specialist',
+      targetPosition: 'Outbound Telemarketer / Sales Representative',
       startedAt: new Date().toISOString(),
       unfocusCount
     };
@@ -204,24 +420,27 @@ export const App: React.FC = () => {
       },
       replays: { 'rec-1': 1 },
       accuracyScore: 96,
-      totalFields: 24,
-      correctFields: 23,
+      totalFields: 18,
+      correctFields: 17,
       fieldErrors: [],
       completed: true,
       timeSpentSeconds: 240
     };
 
     const activeMulti = multitaskingResult || {
-      chatResolved: 4,
-      chatTotal: 4,
-      ticketsProcessed: 5,
-      ticketsTotal: 5,
-      verificationsDone: 4,
-      verificationsTotal: 4,
+      chatResolved: 5,
+      chatTotal: 5,
+      ticketsProcessed: 6,
+      ticketsTotal: 6,
+      verificationsDone: 6,
+      verificationsTotal: 6,
       accuracyPercentage: 90,
       avgResponseTimeSec: 65,
       overallScore: 92,
-      completed: true
+      completed: true,
+      objectionsResolved: 5,
+      dispositionsHandled: 6,
+      appointmentsBooked: 6
     };
 
     const report = computeOverallAssessment(
@@ -263,69 +482,109 @@ export const App: React.FC = () => {
     localStorage.removeItem('tech_assessment_hr_reports_v1');
   };
 
-  return (
-    <div className="app-container">
-      <Navbar
-        currentSection={currentSection}
-        candidate={candidate}
-        isAdminView={isAdminView}
-        onToggleAdminView={() => setIsAdminView(!isAdminView)}
-        unfocusCount={unfocusCount}
+  // ── PIN Gate: shown when navigating to /#/hrportal before unlock
+  if (showPinGate) {
+    return (
+      <HrPinGate
+        onUnlock={() => {
+          // Refresh from localStorage immediately so newly submitted reports appear
+          setReports(getAllAssessmentReports());
+          setHrUnlocked(true);
+        }}
+        onCancel={() => {
+          window.location.hash = '';
+          setHrUnlocked(false);
+        }}
       />
+    );
+  }
 
-      <main className="main-content">
-        {isAdminView ? (
+  // ── HR Dashboard: shown after unlock on /#/hrportal
+  if (showHrPortal) {
+    return (
+      <div className="app-container">
+        <Navbar
+          currentSection={currentSection}
+          candidate={null}
+          isAdminView={true}
+          unfocusCount={0}
+        />
+        <main className="main-content">
           <HrAdminDashboard
             reports={reports}
             onDeleteReport={handleDeleteReport}
             onClearAll={handleClearAllReports}
             onBackToAssessment={() => {
-              setIsAdminView(false);
+              setHrUnlocked(false);
+              window.location.hash = '';
             }}
-            onRefreshReports={() => {
-              setReports(getAllAssessmentReports());
+            syncStatus={hrSyncStatus}
+            lastSynced={hrLastSynced}
+            onRefreshReports={async () => {
+              setHrSyncStatus('syncing');
+              try {
+                const merged = await syncReportsWithSupabase();
+                setReports(merged.length > 0 ? merged : getAllAssessmentReports());
+                setHrLastSynced(new Date());
+                setHrSyncStatus('live');
+              } catch {
+                setHrSyncStatus('offline');
+              }
             }}
           />
-        ) : (
-          <>
-            <Stepper
-              currentSection={currentSection}
-              completedSections={completedSections}
-              onSelectSection={(sec) => setCurrentSection(sec)}
-            />
+        </main>
+      </div>
+    );
+  }
 
-            {currentSection === 'onboarding' && (
-              <CandidateRegistration onStartAssessment={handleStartAssessment} />
-            )}
+  // ── Candidate Assessment Flow (default)
+  return (
+    <div className="app-container">
+      <Navbar
+        currentSection={currentSection}
+        candidate={candidate}
+        unfocusCount={unfocusCount}
+      />
 
-            {currentSection === 'typing' && (
-              <TypingTest onComplete={handleCompleteTyping} />
-            )}
+      <main className="main-content">
+        <Stepper
+          currentSection={currentSection}
+          completedSections={completedSections}
+          onSelectSection={(sec) => setCurrentSection(sec)}
+        />
 
-            {currentSection === 'navigation' && (
-              <ComputerNavigationTest onComplete={handleCompleteNavigation} />
-            )}
+        {currentSection === 'onboarding' && (
+          <CandidateRegistration onStartAssessment={handleStartAssessment} />
+        )}
 
-            {currentSection === 'data-entry' && (
-              <DataEntryTest onComplete={handleCompleteDataEntry} />
-            )}
+        {currentSection === 'typing' && (
+          <TypingTest onComplete={handleCompleteTyping} />
+        )}
 
-            {currentSection === 'multitasking' && (
-              <MultitaskingTest onComplete={handleCompleteMultitasking} />
-            )}
+        {currentSection === 'navigation' && (
+          <ComputerNavigationTest onComplete={handleCompleteNavigation} />
+        )}
 
-            {currentSection === 'troubleshooting' && (
-              <TroubleshootingTest onComplete={handleCompleteTroubleshooting} />
-            )}
+        {currentSection === 'data-entry' && (
+          <DataEntryTest onComplete={handleCompleteDataEntry} />
+        )}
 
-            {currentSection === 'results' && finalReport && (
-              <CandidateResults
-                report={finalReport}
-                onRetest={handleRetest}
-                onGoToAdmin={() => setIsAdminView(true)}
-              />
-            )}
-          </>
+        {currentSection === 'multitasking' && (
+          <MultitaskingTest onComplete={handleCompleteMultitasking} />
+        )}
+
+        {currentSection === 'troubleshooting' && (
+          <TroubleshootingTest onComplete={handleCompleteTroubleshooting} />
+        )}
+
+        {currentSection === 'results' && finalReport && (
+          <CandidateResults
+            report={finalReport}
+            onRetest={handleRetest}
+            onGoToAdmin={() => {
+              window.location.hash = '#/hrportal';
+            }}
+          />
         )}
       </main>
     </div>

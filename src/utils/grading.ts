@@ -23,6 +23,115 @@ export function normalizePhone(phone: string | undefined): string {
   return phone.replace(/\D/g, '');
 }
 
+export const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const MONTH_MAP: Record<string, string> = {
+  january: '01', jan: '01',
+  february: '02', feb: '02',
+  march: '03', mar: '03',
+  april: '04', apr: '04',
+  may: '05',
+  june: '06', jun: '06',
+  july: '07', jul: '07',
+  august: '08', aug: '08',
+  september: '09', sep: '09', sept: '09',
+  october: '10', oct: '10',
+  november: '11', nov: '11',
+  december: '12', dec: '12'
+};
+
+// Parses string like "September 18, 2026, 2:00 PM" into { date: "2026-09-18", time: "14:00" }
+export function parseAppointmentString(str: string | undefined): { date: string; time: string } {
+  if (!str) return { date: '', time: '' };
+
+  const trimmed = str.trim();
+  // Check ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    const parts = trimmed.split(/[T\s]/);
+    return {
+      date: parts[0] || '',
+      time: parts[1] ? parts[1].slice(0, 5) : ''
+    };
+  }
+
+  let date = '';
+  let time = '';
+
+  const monthMatch = trimmed.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+  const yearMatch = trimmed.match(/\b(20\d\d)\b/);
+
+  if (monthMatch && yearMatch) {
+    const monthKey = monthMatch[1].toLowerCase();
+    const mm = MONTH_MAP[monthKey] || '01';
+    const yyyy = yearMatch[1];
+    const afterMonth = trimmed.slice(trimmed.toLowerCase().indexOf(monthKey) + monthKey.length);
+    const dayMatch = afterMonth.match(/\s*(\d{1,2})/);
+    const dd = dayMatch ? dayMatch[1].padStart(2, '0') : '01';
+    date = `${yyyy}-${mm}-${dd}`;
+  }
+
+  const timeMatch = trimmed.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  if (timeMatch) {
+    let hour = parseInt(timeMatch[1], 10);
+    const min = timeMatch[2];
+    const ampm = timeMatch[3]?.toLowerCase();
+    if (ampm === 'pm' && hour < 12) hour += 12;
+    if (ampm === 'am' && hour === 12) hour = 0;
+    time = `${hour.toString().padStart(2, '0')}:${min}`;
+  }
+
+  return { date, time };
+}
+
+// Formats date ("YYYY-MM-DD") and time ("HH:mm") into standard string e.g. "September 18, 2026, 2:00 PM"
+export function formatToAppointmentString(dateStr: string, timeStr: string): string {
+  if (!dateStr) return '';
+  const [yStr, mStr, dStr] = dateStr.split('-');
+  const year = parseInt(yStr, 10);
+  const monthIdx = parseInt(mStr, 10) - 1;
+  const monthName = MONTH_NAMES[monthIdx] || '';
+  const day = dStr || '01';
+
+  if (!timeStr) {
+    return `${monthName} ${day}, ${year}`;
+  }
+
+  const [hStr, minStr] = timeStr.split(':');
+  let hour = parseInt(hStr, 10);
+  const minutes = minStr || '00';
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  if (hour === 0) {
+    hour = 12;
+  } else if (hour > 12) {
+    hour -= 12;
+  }
+
+  return `${monthName} ${day}, ${year}, ${hour}:${minutes} ${ampm}`;
+}
+
+// Address normalizer for flexible abbreviations and punctuation
+export function normalizeAddress(s: string | undefined): string {
+  if (!s) return '';
+  return normalizeStr(s)
+    .replace(/[,\.#\/\-]/g, ' ')
+    .replace(/\b(blvd|blvrd|bvd|blv)\b/g, 'boulevard')
+    .replace(/\b(ave|av)\b/g, 'avenue')
+    .replace(/\b(dr)\b/g, 'drive')
+    .replace(/\b(ct|crt)\b/g, 'court')
+    .replace(/\b(st|str)\b/g, 'street')
+    .replace(/\b(rd)\b/g, 'road')
+    .replace(/\b(ste|suit)\b/g, 'suite')
+    .replace(/\b(bldg|bld|bldng)\b/g, 'building')
+    .replace(/\b(flr|fl)\b/g, 'floor')
+    .replace(/\b(apt)\b/g, 'apartment')
+    .replace(/\b(rm)\b/g, 'room')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Field-by-field comparator
 export function evaluateFieldMatch(
   field: keyof DataEntryRecord,
@@ -40,27 +149,32 @@ export function evaluateFieldMatch(
     return expNorm === actNorm;
   }
   if (field === 'email') {
-    return expNorm === actNorm;
+    if (expNorm === actNorm) return true;
+    // Allow dot variations before the '@' (e.g. m.calhoun@apexbio.org vs mcalhoun@apexbio.org)
+    const cleanEmail = (e: string) => {
+      const [user, domain] = e.split('@');
+      return `${(user || '').replace(/\./g, '')}@${domain || ''}`;
+    };
+    return cleanEmail(expNorm) === cleanEmail(actNorm);
   }
   if (field === 'customerName') {
     return expNorm === actNorm;
   }
   if (field === 'streetAddress') {
-    const cleanAddr = (s: string) =>
-      normalizeStr(s)
-        .replace(/,/g, '')
-        .replace(/\bave\b/g, 'avenue')
-        .replace(/\bblvd\b/g, 'boulevard')
-        .replace(/\bdr\b/g, 'drive')
-        .replace(/\bct\b/g, 'court')
-        .replace(/\bste\b/g, 'suite')
-        .replace(/\s+/g, ' ');
-    return cleanAddr(expected) === cleanAddr(actual);
+    return normalizeAddress(expected) === normalizeAddress(actual);
   }
   if (field === 'appointment') {
-    // Check if key date components match
-    const expDateClean = expNorm.replace(/,/g, '').replace(/\s+/g, ' ');
-    const actDateClean = actNorm.replace(/,/g, '').replace(/\s+/g, ' ');
+    const expParsed = parseAppointmentString(expected);
+    const actParsed = parseAppointmentString(actual);
+    if (expParsed.date && actParsed.date) {
+      const [ey, em, ed] = expParsed.date.split('-');
+      const [ay, am, ad] = actParsed.date.split('-');
+      const dateMatches = ey === ay && em === am && parseInt(ed, 10) === parseInt(ad, 10);
+      const timeMatches = !expParsed.time || expParsed.time === actParsed.time;
+      if (dateMatches && timeMatches) return true;
+    }
+    const expDateClean = expNorm.replace(/,/g, '').replace(/\bat\b/g, '').replace(/\s+/g, ' ');
+    const actDateClean = actNorm.replace(/,/g, '').replace(/\bat\b/g, '').replace(/\s+/g, ' ');
     return expDateClean === actDateClean;
   }
 

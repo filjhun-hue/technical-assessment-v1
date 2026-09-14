@@ -4,6 +4,25 @@ export class AudioEngine {
   private static utterance: SpeechSynthesisUtterance | null = null;
   private static isSpeaking: boolean = false;
   private static onStateChangeCallback: ((speaking: boolean, progress: number) => void) | null = null;
+  private static keepAliveTimer: number | null = null;
+
+  private static startKeepAlive(): void {
+    this.stopKeepAlive();
+    // Chromium bug workaround: speech synthesis abruptly pauses after ~15 seconds without a resume ping
+    this.keepAliveTimer = window.setInterval(() => {
+      if ('speechSynthesis' in window && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    }, 10000);
+  }
+
+  private static stopKeepAlive(): void {
+    if (this.keepAliveTimer !== null) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
+  }
 
   public static speakText(
     text: string,
@@ -16,7 +35,7 @@ export class AudioEngine {
       return false;
     }
 
-    window.speechSynthesis.cancel();
+    this.stop();
     this.onStateChangeCallback = onStateChange || null;
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -26,11 +45,31 @@ export class AudioEngine {
     utterance.pitch = 1.0;
     utterance.lang = 'en-US';
 
-    // Choose preferred clear English voice if available
+    // Choose preferred clear English male voice to match prospect persona
     const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(
-      (v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('David') || v.name.includes('Zira'))
-    ) || voices.find((v) => v.lang.startsWith('en'));
+    const naturalVoice =
+      voices.find(
+        (v) =>
+          v.lang.startsWith('en') &&
+          (v.name.includes('David') ||
+            v.name.includes('Guy') ||
+            v.name.includes('Mark') ||
+            v.name.includes('George') ||
+            v.name.includes('James') ||
+            v.name.includes('Ryan') ||
+            v.name.includes('Christopher') ||
+            v.name.includes('Male'))
+      ) ||
+      voices.find(
+        (v) =>
+          v.lang.startsWith('en') &&
+          (v.name.includes('Natural') || v.name.includes('Google')) &&
+          !v.name.includes('Zira') &&
+          !v.name.includes('Samantha') &&
+          !v.name.includes('Jenny') &&
+          !v.name.includes('Female')
+      ) ||
+      voices.find((v) => v.lang.startsWith('en'));
 
     if (naturalVoice) {
       utterance.voice = naturalVoice;
@@ -38,6 +77,7 @@ export class AudioEngine {
 
     utterance.onstart = () => {
       this.isSpeaking = true;
+      this.startKeepAlive();
       if (this.onStateChangeCallback) this.onStateChangeCallback(true, 0);
     };
 
@@ -50,6 +90,7 @@ export class AudioEngine {
 
     utterance.onend = () => {
       this.isSpeaking = false;
+      this.stopKeepAlive();
       if (this.onStateChangeCallback) this.onStateChangeCallback(false, 100);
       if (onEnd) onEnd();
     };
@@ -57,6 +98,7 @@ export class AudioEngine {
     utterance.onerror = (e) => {
       console.warn('SpeechSynthesis error:', e);
       this.isSpeaking = false;
+      this.stopKeepAlive();
       if (this.onStateChangeCallback) this.onStateChangeCallback(false, 0);
     };
 
@@ -77,6 +119,7 @@ export class AudioEngine {
   }
 
   public static stop(): void {
+    this.stopKeepAlive();
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       this.isSpeaking = false;

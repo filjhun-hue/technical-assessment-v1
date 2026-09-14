@@ -1,20 +1,18 @@
 import React from 'react';
 import { CandidateInfo, TestSectionId } from '../../types/assessment';
-import { Award, Shield, User, FileSpreadsheet, Eye } from 'lucide-react';
+import { Shield, User, Eye } from 'lucide-react';
 
 interface NavbarProps {
   currentSection: TestSectionId;
   candidate: CandidateInfo | null;
-  isAdminView: boolean;
-  onToggleAdminView: () => void;
+  isAdminView?: boolean;
   unfocusCount: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentSection,
   candidate,
-  isAdminView,
-  onToggleAdminView,
+  isAdminView = false,
   unfocusCount
 }) => {
   return (
@@ -26,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="brand-title">HR AssessPro</div>
-            <div className="brand-subtitle">Technical Competency & Assessment Suite</div>
+            <div className="brand-subtitle">Technical Competency &amp; Assessment Suite</div>
           </div>
         </div>
 
@@ -46,22 +44,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
           )}
-
-          <button
-            type="button"
-            className={`mode-toggle-btn ${isAdminView ? 'admin-active' : ''}`}
-            onClick={onToggleAdminView}
-          >
-            {isAdminView ? (
-              <>
-                <Award size={15} /> Candidate View
-              </>
-            ) : (
-              <>
-                <FileSpreadsheet size={15} /> HR Admin Portal
-              </>
-            )}
-          </button>
         </div>
       </div>
     </header>

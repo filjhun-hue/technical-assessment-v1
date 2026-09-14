@@ -158,20 +158,23 @@ export const ComputerNavigationTest: React.FC<ComputerNavigationTestProps> = ({ 
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                const autoAnswers: Record<string, string> = {};
-                NAVIGATION_QUESTIONS.forEach((q) => {
-                  autoAnswers[q.id] = q.correctOptionId;
-                });
-                setAnswers(autoAnswers);
-              }}
-              style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}
-            >
-              ⚡ Quick-Select Answers (Demo)
-            </button>
+            {typeof window !== 'undefined' && (window.location.search.includes('demo=true') || (import.meta as any).env?.DEV) && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const autoAnswers: Record<string, string> = {};
+                  NAVIGATION_QUESTIONS.forEach((q) => {
+                    autoAnswers[q.id] = q.correctOptionId;
+                  });
+                  setAnswers(autoAnswers);
+                }}
+                style={{ padding: '0.6rem 1rem', fontSize: '0.85rem', opacity: 0.7 }}
+                title="Only visible in development/demo mode"
+              >
+                ⚡ Quick-Select Answers (Demo)
+              </button>
+            )}
 
             <button
               type="submit"

@@ -74,6 +74,9 @@ export function exportReportsToCSV(reports: CandidateAssessmentReport[]): void {
     'Navigation Quiz (%)',
     'Data Entry Accuracy (%)',
     'Multitasking Score (%)',
+    'Objections Overcome',
+    'Dispositions Logged',
+    'Appointments Booked',
     'Troubleshooting Quiz (%)',
     'Tab Unfocus Count'
   ];
@@ -93,6 +96,9 @@ export function exportReportsToCSV(reports: CandidateAssessmentReport[]): void {
     r.navigation.percentage,
     r.dataEntry.accuracyScore,
     r.multitasking.overallScore,
+    r.multitasking.objectionsResolved ?? r.multitasking.chatResolved,
+    r.multitasking.dispositionsHandled ?? r.multitasking.ticketsProcessed,
+    r.multitasking.appointmentsBooked ?? r.multitasking.verificationsDone,
     r.troubleshooting.percentage,
     r.candidate.unfocusCount || 0
   ]);

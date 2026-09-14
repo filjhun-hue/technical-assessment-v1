@@ -19,7 +19,7 @@ const STEPS: StepItemConfig[] = [
   { id: 'typing', label: 'Typing Test', icon: Keyboard, stepNum: 1 },
   { id: 'navigation', label: 'Computer Navigation', icon: Compass, stepNum: 2 },
   { id: 'data-entry', label: 'Audio Data Entry', icon: Headphones, stepNum: 3 },
-  { id: 'multitasking', label: 'Multitasking Sim', icon: Layers, stepNum: 4 },
+  { id: 'multitasking', label: 'Outbound Sales Sim', icon: Layers, stepNum: 4 },
   { id: 'troubleshooting', label: 'Troubleshooting', icon: Wrench, stepNum: 5 }
 ];
 
@@ -37,6 +37,7 @@ export const Stepper: React.FC<StepperProps> = ({
       {STEPS.map((step) => {
         const isActive = currentSection === step.id;
         const isCompleted = completedSections.has(step.id);
+        const isAccessible = isCompleted || isActive;
         const Icon = step.icon;
 
         return (
@@ -44,11 +45,19 @@ export const Stepper: React.FC<StepperProps> = ({
             key={step.id}
             className={`step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
             onClick={() => {
-              if (onSelectSection) {
+              if (onSelectSection && isAccessible) {
                 onSelectSection(step.id);
               }
             }}
-            style={{ cursor: 'pointer' }}
+            style={{
+              cursor: isAccessible ? 'pointer' : 'not-allowed',
+              opacity: isAccessible ? 1 : 0.6
+            }}
+            title={
+              isAccessible
+                ? `Go to ${step.label}`
+                : `Complete preceding modules to unlock ${step.label}`
+            }
           >
             <div className="step-number">
               {isCompleted ? <CheckCircle2 size={16} /> : step.stepNum}

@@ -237,13 +237,13 @@ export const CandidateResults: React.FC<CandidateResultsProps> = ({
           <div className="stat-box" style={{ textAlign: 'left', background: 'rgba(15, 23, 42, 0.7)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
               <Layers size={18} color="#818cf8" />
-              <strong style={{ fontSize: '0.95rem' }}>4. Multitasking Sim</strong>
+              <strong style={{ fontSize: '0.95rem' }}>4. Outbound Sales Sim</strong>
             </div>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginBottom: '0.2rem' }}>
               {multitasking.overallScore}%
             </div>
             <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-              Chats: <strong style={{ color: '#fff' }}>{multitasking.chatResolved}</strong> • Tickets: <strong style={{ color: '#fff' }}>{multitasking.ticketsProcessed}</strong>
+              Objections: <strong style={{ color: '#fff' }}>{multitasking.chatResolved}</strong> • Dispositions: <strong style={{ color: '#fff' }}>{multitasking.ticketsProcessed}</strong> • Appts: <strong style={{ color: '#fff' }}>{multitasking.verificationsDone}</strong>
             </div>
           </div>
 

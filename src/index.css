@@ -68,6 +68,17 @@ h1, h2, h3, h4, h5, h6 {
   color: #fff;
 }
 
+/* Utility Animations */
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50%       { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* App Layout */
 .app-container {
   display: flex;
@@ -394,6 +405,25 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+/* Date and Time Input Polish */
+input[type="date"], input[type="time"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) sepia(100%) saturate(200%) hue-rotate(190deg);
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
 /* Keyboard Shortcut Keycap Styling */
 kbd {
   display: inline-block;
@@ -703,22 +733,68 @@ kbd {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-/* Print Stylesheet for Certificate / Scorecard */
+/* Print Stylesheet for Certificate / Scorecard & Audit Report */
 @media print {
+  @page {
+    size: A4;
+    margin: 15mm 12mm;
+  }
+
   body {
     background: #fff !important;
-    color: #000 !important;
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+
   .navbar, .stepper-nav, .no-print {
     display: none !important;
   }
+
+  .main-content {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
   .glass-panel {
-    border: 1px solid #ccc !important;
+    border: 1px solid #dde !important;
     box-shadow: none !important;
     background: #fff !important;
-    color: #000 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 12px !important;
+    padding: 14px !important;
   }
-  h1, h2, h3, h4, .stat-value {
-    color: #000 !important;
+
+  h1, h2, h3, h4 {
+    color: #111 !important;
+  }
+
+  .stat-value {
+    color: #111 !important;
+  }
+
+  /* Keep color badges readable in print */
+  .badge-success {
+    background: #d1fae5 !important;
+    color: #065f46 !important;
+    border-color: #6ee7b7 !important;
+  }
+  .badge-warning {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+    border-color: #fcd34d !important;
+  }
+  .badge-danger {
+    background: #fee2e2 !important;
+    color: #991b1b !important;
+    border-color: #fca5a5 !important;
+  }
+
+  /* Score bars still look decent in B&W print */
+  code, .font-mono {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
   }
 }

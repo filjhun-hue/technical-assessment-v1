@@ -80,16 +80,19 @@ export interface DataEntrySubmission {
 }
 
 export interface MultitaskingMetric {
-  chatResolved: number;
+  chatResolved: number; // Mapped to objectionsResolved
   chatTotal: number;
-  ticketsProcessed: number;
+  ticketsProcessed: number; // Mapped to dispositionsLogged
   ticketsTotal: number;
-  verificationsDone: number;
+  verificationsDone: number; // Mapped to appointmentsBooked
   verificationsTotal: number;
   accuracyPercentage: number;
   avgResponseTimeSec: number;
   overallScore: number; // 0 to 100
   completed: boolean;
+  objectionsResolved?: number;
+  dispositionsHandled?: number;
+  appointmentsBooked?: number;
 }
 
 export interface CandidateAssessmentReport {
